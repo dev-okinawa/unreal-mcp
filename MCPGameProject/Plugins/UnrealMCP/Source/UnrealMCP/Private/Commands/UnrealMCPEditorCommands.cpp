@@ -20,6 +20,10 @@
 #include "Subsystems/EditorActorSubsystem.h"
 #include "Engine/Blueprint.h"
 #include "Engine/BlueprintGeneratedClass.h"
+#include "IPythonScriptPlugin.h"
+#include "UObject/SavePackage.h"
+#include "FileHelpers.h"
+#include "PackageTools.h"
 
 FUnrealMCPEditorCommands::FUnrealMCPEditorCommands()
 {
@@ -59,6 +63,22 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleCommand(const FString& C
     else if (CommandType == TEXT("set_actor_property"))
     {
         return HandleSetActorProperty(Params);
+    }
+    else if (CommandType == TEXT("set_actor_component_property"))
+    {
+        return HandleSetActorComponentProperty(Params);
+    }
+    else if (CommandType == TEXT("save_asset"))
+    {
+        return HandleSaveAsset(Params);
+    }
+    else if (CommandType == TEXT("save_all_dirty_packages"))
+    {
+        return HandleSaveAllDirtyPackages(Params);
+    }
+    else if (CommandType == TEXT("run_python"))
+    {
+        return HandleRunPython(Params);
     }
     // Blueprint actor spawning
     else if (CommandType == TEXT("spawn_blueprint_actor"))
@@ -597,4 +617,126 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleTakeScreenshot(const TSh
     }
     
     return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Failed to take screenshot"));
-} 
+}
+
+TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSetActorComponentProperty(const TSharedPtr<FJsonObject>& Params)
+{
+    FString ActorName;
+    FString ComponentName;
+    FString PropertyName;
+    TSharedPtr<FJsonValue> PropertyValue = Params->TryGetField(TEXT("property_value"));
+
+    if (!Params->TryGetStringField(TEXT("name"), ActorName) || 
+        !Params->TryGetStringField(TEXT("component_name"), ComponentName) ||
+        !Params->TryGetStringField(TEXT("property_name"), PropertyName) ||
+        !PropertyValue.IsValid())
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing required parameters: name, component_name, property_name, property_value"));
+    }
+
+    AActor* Actor = FUnrealMCPCommonUtils::FindActorByName(ActorName);
+    if (!Actor)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+    }
+
+    UActorComponent* TargetComponent = nullptr;
+    TArray<UActorComponent*> Components;
+    Actor->GetComponents(Components);
+
+    for (UActorComponent* Component : Components)
+    {
+        if (Component->GetName() == ComponentName)
+        {
+            TargetComponent = Component;
+            break;
+        }
+    }
+
+    if (!TargetComponent)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Component not found: %s on actor %s"), *ComponentName, *ActorName));
+    }
+
+    FString ErrorMessage;
+    if (FUnrealMCPCommonUtils::SetObjectProperty(TargetComponent, PropertyName, PropertyValue, ErrorMessage))
+    {
+        return FUnrealMCPCommonUtils::CreateSuccessResponse(nullptr);
+    }
+
+    return FUnrealMCPCommonUtils::CreateErrorResponse(ErrorMessage);
+}
+
+TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSaveAsset(const TSharedPtr<FJsonObject>& Params)
+{
+    FString AssetPath;
+    if (!Params->TryGetStringField(TEXT("path"), AssetPath))
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing required parameter: path"));
+    }
+
+    UPackage* Package = FindPackage(nullptr, *AssetPath);
+    if (!Package)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Package not found: %s"), *AssetPath));
+    }
+
+    FString Filename = FPackageName::LongPackageNameToFilename(AssetPath, FPackageName::GetAssetPackageExtension());
+
+    FSavePackageArgs SaveArgs;
+    SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
+    SaveArgs.Error = GError;
+    SaveArgs.bForceByteSwapping = false;
+    SaveArgs.bWarnOfLongFilename = true;
+    SaveArgs.SaveFlags = SAVE_None;
+
+    bool bSuccess = UPackage::SavePackage(Package, nullptr, *Filename, SaveArgs);
+    
+    if (bSuccess)
+    {
+        return FUnrealMCPCommonUtils::CreateSuccessResponse(nullptr);
+    }
+    
+    return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Failed to save asset"));
+}
+
+TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSaveAllDirtyPackages(const TSharedPtr<FJsonObject>& Params)
+{
+    bool bSuccess = FEditorFileUtils::SaveDirtyPackages(true, true, true);
+    if (bSuccess)
+    {
+        return FUnrealMCPCommonUtils::CreateSuccessResponse(nullptr);
+    }
+    return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Failed to save some packages"));
+}
+
+TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleRunPython(const TSharedPtr<FJsonObject>& Params)
+{
+    FString Script;
+    if (!Params->TryGetStringField(TEXT("script"), Script))
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing required parameter: script"));
+    }
+
+    IPythonScriptPlugin* Python = FModuleManager::GetModulePtr<IPythonScriptPlugin>(TEXT("PythonScriptPlugin"));
+    if (!Python)
+    {
+        // Try to load it if it's not loaded
+        Python = &FModuleManager::LoadModuleChecked<IPythonScriptPlugin>(TEXT("PythonScriptPlugin"));
+    }
+
+    if (!Python)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Python scripting is not available in this build"));
+    }
+
+    bool bSuccess = Python->ExecPythonCommand(*Script);
+    
+    if (bSuccess)
+    {
+        return FUnrealMCPCommonUtils::CreateSuccessResponse(nullptr);
+    }
+    
+    return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Python execution failed"));
+}
+ 

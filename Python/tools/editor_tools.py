@@ -366,4 +366,69 @@ def register_editor_tools(mcp: FastMCP):
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 
+    @mcp.tool()
+    def set_actor_component_property(
+        ctx: Context,
+        name: str,
+        component_name: str,
+        property_name: str,
+        property_value: Any
+    ) -> Dict[str, Any]:
+        """Set a property on a component of an actor."""
+        from unreal_mcp_server import get_unreal_connection
+        
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+                
+            response = unreal.send_command("set_actor_component_property", {
+                "name": name,
+                "component_name": component_name,
+                "property_name": property_name,
+                "property_value": property_value
+            })
+            return response or {}
+            
+        except Exception as e:
+            logger.error(f"Error setting component property: {e}")
+            return {"status": "error", "message": str(e)}
+
+    @mcp.tool()
+    def save_asset(ctx: Context, path: str) -> Dict[str, Any]:
+        """Save an asset by its path (e.g., /Game/Blueprints/BP_MyActor)."""
+        from unreal_mcp_server import get_unreal_connection
+        
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+                
+            response = unreal.send_command("save_asset", {"path": path})
+            return response or {}
+            
+        except Exception as e:
+            logger.error(f"Error saving asset: {e}")
+            return {"status": "error", "message": str(e)}
+
+    @mcp.tool()
+    def run_python(ctx: Context, script: str) -> Dict[str, Any]:
+        """Run a Python script in the Unreal Editor."""
+        from unreal_mcp_server import get_unreal_connection
+        
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+                
+            response = unreal.send_command("run_python", {"script": script})
+            return response or {}
+            
+        except Exception as e:
+            logger.error(f"Error running python script: {e}")
+            return {"status": "error", "message": str(e)}
+
     logger.info("Editor tools registered successfully")

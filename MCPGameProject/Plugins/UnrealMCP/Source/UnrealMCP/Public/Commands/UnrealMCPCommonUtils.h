@@ -33,6 +33,7 @@ public:
     static FRotator GetRotatorFromJson(const TSharedPtr<FJsonObject>& JsonObject, const FString& FieldName);
     
     // Actor utilities
+    static AActor* FindActorByName(const FString& Name);
     static TSharedPtr<FJsonValue> ActorToJson(AActor* Actor);
     static TSharedPtr<FJsonObject> ActorToJsonObject(AActor* Actor, bool bDetailed = false);
     

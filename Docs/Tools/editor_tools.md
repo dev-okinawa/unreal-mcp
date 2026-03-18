@@ -57,6 +57,79 @@ Capture a screenshot of the viewport.
 }
 ```
 
+### run_python
+
+Run a Python script in the Unreal Editor. This tool provides powerful extensibility, allowing you to execute any command available in the Unreal Python API.
+
+**Parameters:**
+- `script` (string) - The Python code to execute.
+
+**Returns:**
+- Response indicating success or failure.
+
+**Example:**
+```json
+{
+  "command": "run_python",
+  "params": {
+    "script": "import unreal; unreal.EditorLevelLibrary.spawn_actor_from_class(unreal.StaticMeshActor, unreal.Vector(0,0,0))"
+  }
+}
+```
+
+### set_actor_component_property
+
+Set a property on a specific component of an actor in the level.
+
+**Parameters:**
+- `name` (string) - Name of the target actor.
+- `component_name` (string) - Name of the component to modify.
+- `property_name` (string) - Name of the property to set.
+- `property_value` (any) - The value to assign to the property.
+
+**Returns:**
+- Status of the operation.
+
+**Example:**
+```json
+{
+  "command": "set_actor_component_property",
+  "params": {
+    "name": "PointLight_1",
+    "component_name": "LightComponent0",
+    "property_name": "Intensity",
+    "property_value": 5000.0
+  }
+}
+```
+
+### save_asset
+
+Save an asset or package to disk. This is useful for ensuring that procedurally created assets (like Blueprints) are persisted and visible to other tools.
+
+**Parameters:**
+- `path` (string) - The full content path of the asset (e.g., `/Game/Blueprints/MyBP`).
+
+**Returns:**
+- Success or error status.
+
+**Example:**
+```json
+{
+  "command": "save_asset",
+  "params": {
+    "path": "/Game/Blueprints/BP_RedCube"
+  }
+}
+```
+
+### save_all_dirty_packages
+
+Save all modified (dirty) packages in the project.
+
+**Returns:**
+- Status indicating if the save operation succeeded.
+
 ## Error Handling
 
 All command responses include a "status" field indicating whether the operation succeeded, and an optional "message" field with details in case of failure.

@@ -7,6 +7,7 @@
 #include "K2Node_Event.h"
 #include "K2Node_CallFunction.h"
 #include "K2Node_VariableGet.h"
+#include "EngineUtils.h"
 #include "K2Node_VariableSet.h"
 #include "K2Node_InputAction.h"
 #include "K2Node_Self.h"
@@ -486,6 +487,22 @@ TSharedPtr<FJsonObject> FUnrealMCPCommonUtils::ActorToJsonObject(AActor* Actor, 
     ActorObject->SetArrayField(TEXT("scale"), ScaleArray);
     
     return ActorObject;
+}
+
+AActor* FUnrealMCPCommonUtils::FindActorByName(const FString& Name)
+{
+    if (GEditor && GEditor->GetEditorWorldContext().World())
+    {
+        UWorld* World = GEditor->GetEditorWorldContext().World();
+        for (TActorIterator<AActor> It(World); It; ++It)
+        {
+            if (It->GetName() == Name)
+            {
+                return *It;
+            }
+        }
+    }
+    return nullptr;
 }
 
 UK2Node_Event* FUnrealMCPCommonUtils::FindExistingEventNode(UEdGraph* Graph, const FString& EventName)
